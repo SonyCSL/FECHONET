@@ -31,6 +31,7 @@ import java.util.TimerTask;
 
 import com.sonycsl.echo.Echo;
 import com.sonycsl.echo.eoj.device.DeviceObject;
+import com.sonycsl.echo.eoj.device.housingfacilities.PowerDistributionBoardMetering;
 import com.sonycsl.echo.processing.defaults.DefaultNodeProfile;
 import com.sonycsl.fechonet.FPlugInterface.Plug;
 
@@ -39,9 +40,19 @@ public class ECHOManager extends FPlugCallback {
 
 	FPowerDistributionBoardMetering powerDist ;
 	DeviceObject[][] devs ;
+	
+	boolean enabledAnnouncement = true;
 
 	public ECHOManager(FWidgetProvider.WidgetService ws) {
 		mMain = ws ;
+	}
+
+	public void enableAnnounceChangedStatus() {
+		
+	}
+	
+	public void disableAnnounceChangedStatus() {
+		
 	}
 	
 	public void setupEchoNode(){
@@ -81,6 +92,8 @@ public class ECHOManager extends FPlugCallback {
 			mMain.fPlug.plugs[pi].updateLight();
 			mMain.fPlug.plugs[pi].updateTemperature();
 			mMain.fPlug.plugs[pi].updateHumidity();
+			powerDist.mVals[pi] = null;
+			powerDist.mVals_Cum[pi] = null;
 			mMain.fPlug.plugs[pi].updateElectricity();
 			//mainActivity.fPlug.plugs[pi].updateElectricity_Cum();
 		}
@@ -99,6 +112,14 @@ public class ECHOManager extends FPlugCallback {
 		FIlluminanceSensor d = ((FIlluminanceSensor)devs[pi][0]) ;
 		d.mVal_1[0] = result[0] ;
 		d.mVal_1[1] = result[1] ;
+		if(enabledAnnouncement) {
+			try {
+				d.inform().reqInformMeasuredIlluminanceValue1().send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 
 		int tempdata = (int) (result[1] & 0xff);
  	   	tempdata += ((int) result[0] & 0xff) * 256;
@@ -117,6 +138,15 @@ public class ECHOManager extends FPlugCallback {
 		FTemperatureSensor d = ((FTemperatureSensor)devs[pi][1]) ;
 		d.mVal[0] = result[0] ;
 		d.mVal[1] = result[1] ;
+
+		if(enabledAnnouncement) {
+			try {
+				d.inform().reqInformMeasuredTemperatureValue().send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 
 		
 		int tempdata = (int) result[0] & 0xff;
@@ -146,6 +176,15 @@ public class ECHOManager extends FPlugCallback {
 		FHumiditySensor d = ((FHumiditySensor)devs[pi][2]) ;
 		d.mVal[0] = result[0] ;
 
+		if(enabledAnnouncement) {
+			try {
+				d.inform().reqInformMeasuredValueOfRelativeHumidity().send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+
 		
 		System.out.println("Humidity : "+(result[0]&0xff)) ;
     }
@@ -159,8 +198,35 @@ public class ECHOManager extends FPlugCallback {
 		if( pi == mMain.fPlug.plugs.length )
 			return ;	// No corresponding plug found
 
-		powerDist.mVals[pi][0] = result[0] ;
-		powerDist.mVals[pi][1] = result[1] ;
+		//powerDist.mVals[pi][0] = result[0] ;
+		//powerDist.mVals[pi][1] = result[1] ;
+		powerDist.mVals[pi] = result;
+
+		boolean flag = true;
+		for(int p=0;p<mMain.fPlug.plugs.length;++p ){
+			if( powerDist.mVals[p] == null) {
+				flag = false;
+				break;
+			}
+		}
+		if(enabledAnnouncement) {
+			try {
+				powerDist.inform().reqInformProperty((byte)((PowerDistributionBoardMetering.EPC_MEASUREMENT_CHANNEL1 & 0xFF)+pi)).send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		if(flag && enabledAnnouncement) {
+			try {
+				powerDist.inform().reqInformMeasuredInstantaneoUsAmountOfElectricEnergy().send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
+
 		int tempdata = (int) result[0] & 0xff;
 		double doubledata ;
         if (tempdata > 0x7f) // negative reading
@@ -184,9 +250,26 @@ public class ECHOManager extends FPlugCallback {
 		if( pi == mMain.fPlug.plugs.length )
 			return ;	// No corresponding plug found
 
-		powerDist.mVals_Cum[pi][0] = result[0] ;
-		powerDist.mVals_Cum[pi][1] = result[1] ;
+		//powerDist.mVals_Cum[pi][0] = result[0] ;
+		//powerDist.mVals_Cum[pi][1] = result[1] ;
+		powerDist.mVals_Cum[pi] = result;
 
+		boolean flag = true;
+		for(int p=0;p<mMain.fPlug.plugs.length;++p ){
+			if( powerDist.mVals[p] == null) {
+				flag = false;
+				break;
+			}
+		}
+		if(flag && enabledAnnouncement) {
+			try {
+				powerDist.inform().reqInformMeasuredCumulativeAmountOfElectricEnergyNormalDirection().send();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		
 		int tempdata = (int) result[0] & 0xff;
 		double doubledata ;
         if (tempdata > 0x7f) // negative reading
